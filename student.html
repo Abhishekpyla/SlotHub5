@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Campus Connect | Student Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .view-section { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; }
+        .badge-pending { @apply bg-amber-100 text-amber-700; }
+        .badge-approved { @apply bg-emerald-100 text-emerald-700; }
+        .badge-rejected { @apply bg-rose-100 text-rose-700; }
+        .badge-suggested { @apply bg-indigo-100 text-indigo-700; }
+        
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .transition-all { transition-duration: 200ms; }
+        
+        /* Hide scrollbar for calendar events */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', dark: '#0F172A' } } }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden antialiased">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-6 right-6 z-[100] flex flex-col gap-3"></div>
+
+    <!-- INTERNAL LOGIN OVERLAY -->
+    <div id="loginView"
+        class="fixed inset-0 bg-white z-[60] flex flex-col items-center justify-center p-6 text-center transition-all duration-500">
+        <div class="max-w-md w-full">
+            <div
+                class="w-20 h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
+                <i class="fa-solid fa-user-graduate text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Student Portal</h1>
+            <p class="text-slate-500 mb-10">Smart Campus Connect Integrated System</p>
+
+            <button onclick="login()"
+                class="w-full flex items-center justify-between p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 group transition-all">
+                <div class="flex items-center gap-4 text-left">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <i class="fa-solid fa-user-check text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">Sign In</h3>
+                        <p class="text-xs text-slate-500">Enter as Jane Doe</p>
+                    </div>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-blue-600"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <div id="mainLayout" class="hidden flex h-screen">
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col hidden lg:flex">
+            <div class="h-20 flex items-center px-8 border-b border-slate-100 gap-3">
+                <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                    <i class="fa-solid fa-calendar-days text-sm"></i>
+                </div>
+                <span class="font-extrabold text-slate-900 text-lg tracking-tight">CampusHub</span>
+            </div>
+
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div id="userAvatar" class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-lg">J</div>
+                    <div class="overflow-hidden">
+                        <h4 id="userName" class="font-bold text-slate-900 truncate">Jane Doe</h4>
+                        <p id="userRole" class="text-xs text-slate-500 uppercase font-semibold tracking-wider">Student</p>
+                    </div>
+                </div>
+
+                <nav id="navMenu" class="space-y-1.5"></nav>
+            </div>
+
+            <div class="mt-auto p-6 border-t border-slate-100">
+                <button onclick="logout()" class="w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors font-medium">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header class="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8 z-20">
+                <h2 id="viewTitle" class="text-xl font-bold text-slate-900">New Request</h2>
+                <div class="flex items-center gap-4">
+                    <button class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:text-primary transition-all relative">
+                        <i class="fa-regular fa-bell"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="viewContainer" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+
+                <!-- MODULE 1: NEW REQUEST -->
+                <div id="newRequestView" class="view-section hidden">
+                    <div class="max-w-2xl mx-auto space-y-6">
+                        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+                            <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                                <i class="fa-solid fa-paper-plane text-primary"></i> File a New Request
+                            </h3>
+                            <form id="requestForm" class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Faculty Member</label>
+                                    <select id="reqFaculty" onchange="checkAvailabilityInline()" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none"></select>
+                                    <p id="availabilityStatus" class="mt-2 text-[10px] font-bold hidden"></p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Category</label>
+                                        <select id="reqCategory" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none">
+                                            <option value="Academic">Academic</option>
+                                            <option value="On-Duty">On-Duty</option>
+                                            <option value="Personal">Personal</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Preferred Slot</label>
+                                        <input type="datetime-local" id="reqTime" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Reasoning</label>
+                                    <textarea id="reqReason" rows="4" placeholder="Briefly explain your requirement..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none resize-none"></textarea>
+                                </div>
+                                <button type="submit" class="w-full py-4 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                                    Submit Request
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODULE 2: REQUEST TRACKING -->
+                <div id="trackingView" class="view-section hidden">
+                    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-8 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center bg-white">
+                            <div class="flex items-center gap-4">
+                                <h3 class="text-lg font-bold">Request Tracking</h3>
+                                <span class="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500 uppercase">Results: <span id="stuReqTotal">0</span></span>
+                            </div>
+                            
+                            <!-- Filter Toggle Pills -->
+                            <div class="flex gap-1 bg-slate-100 p-1.5 rounded-xl">
+                                <button onclick="setFilter('All')" id="filter-All" class="filter-btn px-4 py-1.5 text-xs font-bold rounded-lg bg-white text-slate-900 shadow-sm transition-all">All</button>
+                                <button onclick="setFilter('Pending')" id="filter-Pending" class="filter-btn px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all">Pending</button>
+                                <button onclick="setFilter('Approved')" id="filter-Approved" class="filter-btn px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all">Approved</button>
+                                <button onclick="setFilter('Rejected')" id="filter-Rejected" class="filter-btn px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all">Rejected</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                                        <th class="px-8 py-4">Request / Faculty</th>
+                                        <th class="px-8 py-4 text-center">Assigned Slot</th>
+                                        <th class="px-8 py-4 text-center">Status</th>
+                                        <th class="px-8 py-4">Faculty Response</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentReqTable" class="divide-y divide-slate-100">
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODULE 3: REGISTRATION HUB -->
+                <div id="registrationHubView" class="view-section hidden">
+                    <div class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                        <div>
+                            <h3 class="text-2xl font-extrabold text-slate-900 mb-2">Campus Registration Hub</h3>
+                            <p class="text-slate-500">Official opportunities posted by faculty members.</p>
+                        </div>
+                        <button onclick="openCalendarModal()" class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
+                            <i class="fa-regular fa-calendar-days text-indigo-600"></i> Event Calendar
+                        </button>
+                    </div>
+                    <div id="eventsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Events Injected via JS -->
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ACTION MODAL (Used for View Details popups) -->
+    <div id="actionModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] hidden flex items-center justify-center p-6 transition-all opacity-0">
+        <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-all">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- FULL SCREEN MAC-STYLE CALENDAR MODAL -->
+    <div id="calendarModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4 md:p-8 transition-all opacity-0">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[1200px] h-[85vh] flex overflow-hidden transform scale-95 transition-all relative">
+            
+            <!-- Left Sidebar (Dark Theme) -->
+            <div class="w-64 md:w-72 bg-[#1E1E1E] text-white p-5 flex flex-col shrink-0 overflow-y-auto">
+                <!-- Mac window controls & Back Button -->
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex gap-2">
+                        <button onclick="closeCalendarModal()" class="w-3 h-3 rounded-full bg-[#FF5F56] hover:bg-red-600 flex items-center justify-center group transition-colors">
+                            <i class="fa-solid fa-xmark text-[8px] opacity-0 group-hover:opacity-100 text-[#1E1E1E]"></i>
+                        </button>
+                        <div class="w-3 h-3 rounded-full bg-[#FFBD2E]"></div>
+                        <div class="w-3 h-3 rounded-full bg-[#27C93F]"></div>
+                    </div>
+                    <button onclick="closeCalendarModal()" class="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors uppercase tracking-widest bg-[#2A2A2A] hover:bg-[#333] px-2.5 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center mb-5 px-1">
+                    <h2 id="calSidebarTitle" class="text-xl font-semibold tracking-tight">Month Year</h2>
+                    <div class="flex gap-4 text-slate-400">
+                        <button onclick="navigateCalendar(-1)" class="hover:text-white transition-colors"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                        <button onclick="navigateCalendar(1)" class="hover:text-white transition-colors"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                    </div>
+                </div>
+
+                <!-- Mini Calendar Grid -->
+                <div class="grid grid-cols-7 gap-y-2 text-center text-[10px] font-bold text-slate-500 mb-2 px-1 uppercase">
+                    <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+                </div>
+                <div class="grid grid-cols-7 gap-y-1 text-center text-[11px] mb-8 px-1" id="miniCalendarGrid">
+                    <!-- Populated via JS -->
+                </div>
+
+                <!-- Event Directory List -->
+                <div class="flex-1 pr-2 flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-[#333] pb-2">Event Directory</h3>
+                    <div id="upcomingEventsList" class="space-y-0 flex-1 overflow-y-auto no-scrollbar">
+                        <!-- Populated via JS -->
+                    </div>
+                    
+                    <!-- NEW: Shortcut button to jump to full Registration Hub -->
+                    <div class="mt-4 pt-4 border-t border-[#333]">
+                        <button onclick="closeCalendarModal(); switchView('registrationHubView');" class="w-full py-2.5 bg-[#2A2A2A] hover:bg-[#333] text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2 border border-[#444]">
+                            <i class="fa-solid fa-list"></i> View All Events & Links
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Calendar Grid Area (Light Theme) -->
+            <div class="flex-1 flex flex-col bg-white min-w-0">
+                <!-- Top Toolbar -->
+                <div class="h-16 border-b border-slate-200 flex items-center justify-between px-6 shrink-0 bg-white z-10">
+                    <div class="flex items-center gap-4">
+                        <button onclick="navigateCalendar(-1)" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="resetToToday()" class="font-medium text-slate-700 px-3 py-1 text-sm rounded hover:bg-slate-100 transition-colors">Today</button>
+                        <button onclick="navigateCalendar(1)" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                    
+                    <div class="flex bg-slate-100 rounded-lg p-1 hidden sm:flex">
+                        <button onclick="setCalendarView('Day')" id="viewBtn-Day" class="px-4 py-1 text-xs font-bold text-slate-500 rounded-md hover:text-slate-700 transition-colors">Day</button>
+                        <button onclick="setCalendarView('Week')" id="viewBtn-Week" class="px-4 py-1 text-xs font-bold text-slate-500 rounded-md hover:text-slate-700 transition-colors">Week</button>
+                        <button onclick="setCalendarView('Month')" id="viewBtn-Month" class="px-4 py-1 text-xs font-bold bg-white text-slate-900 rounded-md shadow-sm transition-all">Month</button>
+                        <button onclick="setCalendarView('Year')" id="viewBtn-Year" class="px-4 py-1 text-xs font-bold text-slate-500 rounded-md hover:text-slate-700 transition-colors">Year</button>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <div class="relative hidden lg:block">
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" placeholder="Search" class="bg-slate-100 rounded-lg pl-8 pr-4 py-1.5 text-sm w-48 outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Days of week Header -->
+                <div class="grid grid-cols-7 border-b border-slate-200 shrink-0 bg-white">
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Sun</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Mon</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Tue</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Wed</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Thu</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Fri</div>
+                    <div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sat</div>
+                </div>
+
+                <!-- Dynamic Grid Injection Area -->
+                <div id="calendarGridContainer" class="flex-1 flex flex-col bg-slate-100 overflow-hidden">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let requests = [
+            { id: 'REQ-1001', student: 'Jane Doe', faculty: 'Dr. Alan Turing', type: 'Academic', time: '2026-03-05T14:30', reason: 'Permission for project seminar', status: 'Approved', feedback: 'Slots assigned at Lab 4. Bring documents.' },
+            { id: 'REQ-1002', student: 'Jane Doe', faculty: 'Dr. Marie Curie', type: 'Personal', time: '2026-03-06T10:00', reason: 'Native visit permission', status: 'Pending', feedback: null }
+        ];
+
+        let events = [
+            { id: 1, title: 'Annual Tech Symposium', link: 'https://symposium.com', desc: 'A global stage for young innovators.', postedBy: 'Dr. Turing', date: '2026-03-20', eligibility: 'All B.Tech & M.Tech Students', details: 'Join us for a full day of tech talks, networking, and project showcases. Registration is mandatory to secure your attendance.', hideFromHub: false },
+            { id: 2, title: 'Code for Cause Hackathon', link: 'https://www.codeforcause.dev/hackathons', desc: 'Build solutions for non-profits.', postedBy: 'Admin', date: '2026-04-15', eligibility: 'CS, IT & Electronics branches (3rd & 4th Year)', details: 'A 48-hour hackathon focused on building software for local NGOs. Teams of 3-4 are allowed. Laptop and college ID required.', hideFromHub: false },
+            { id: 3, title: 'Colors 2025 - Day 1', link: '#', desc: 'Annual Cultural Fest - Inauguration and Arts.', postedBy: 'Cultural Committee', date: '2025-01-08', eligibility: 'All Students', details: 'The grand inauguration of Colors 2025. Enjoy fine arts, painting, and drama performances.', hideFromHub: true },
+            { id: 4, title: 'Colors 2025 - Day 2', link: '#', desc: 'Annual Cultural Fest - Music and Dance.', postedBy: 'Cultural Committee', date: '2025-01-09', eligibility: 'All Students', details: 'Day 2 features inter-college dance and music competitions.', hideFromHub: true },
+            { id: 5, title: 'Colors 2025 - Day 3', link: '#', desc: 'Annual Cultural Fest - DJ Night.', postedBy: 'Cultural Committee', date: '2025-01-10', eligibility: 'All Students', details: 'The grand finale of Colors 2025 with a celebrity DJ.', hideFromHub: true },
+            { id: 6, title: 'Veda 2025 - Day 1', link: '#', desc: 'National Level Technical Symposium.', postedBy: 'Tech Council', date: '2025-09-14', eligibility: 'All Students', details: 'Paper presentations, coding challenges, and robotics workshops.', hideFromHub: true },
+            { id: 7, title: 'Veda 2025 - Day 2', link: '#', desc: 'National Level Technical Symposium.', postedBy: 'Tech Council', date: '2025-09-15', eligibility: 'All Students', details: 'Project expos, intensive 12-hour hackathons, and the valedictory function.', hideFromHub: true }
+        ];
+
+        const facultyList = [
+            { name: 'Dr. Alan Turing', dept: 'CS', avail: true },
+            { name: 'Dr. Marie Curie', dept: 'Physics', avail: false },
+            { name: 'Prof. Richard Feynman', dept: 'Electronics', avail: true }
+        ];
+
+        let currentUser = { role: 'student', name: 'Jane Doe' };
+        let currentFilter = 'All'; // Store the active filter state
+
+        // Utility to check if an event is in the past
+        function checkPastEvent(dateStr) {
+            const eDate = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            return eDate < today;
+        }
+
+        // --- AUTH ---
+        function login() {
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('mainLayout').classList.remove('hidden');
+            
+            buildSidebar();
+            switchView('newRequestView'); // Default view
+            showToast('Student Session Active', 'success');
+        }
+
+        function logout() { 
+            document.getElementById('mainLayout').classList.add('hidden');
+            document.getElementById('loginView').classList.remove('hidden');
+        }
+
+        // --- NAVIGATION ---
+        function buildSidebar() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'newRequestView', icon: 'fa-paper-plane', label: 'New Request' },
+                { id: 'trackingView', icon: 'fa-list-check', label: 'Request Tracking' },
+                { id: 'registrationHubView', icon: 'fa-compass', label: 'Registration Hub' }
+            ];
+
+            menu.innerHTML = items.map(item => `
+                <button onclick="switchView('${item.id}')" data-view="${item.id}" class="nav-btn w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all font-medium">
+                    <i class="fa-solid ${item.icon} w-5"></i>
+                    <span class="text-sm">${item.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                const isActive = b.dataset.view === viewId;
+                b.classList.toggle('bg-blue-50', isActive);
+                b.classList.toggle('text-blue-600', isActive);
+            });
+
+            const titleSpan = document.querySelector(`[data-view="${viewId}"] span`);
+            document.getElementById('viewTitle').textContent = titleSpan ? titleSpan.textContent : 'Dashboard';
+            renderContent();
+        }
+
+        // --- FILTER LOGIC ---
+        function setFilter(status) {
+            currentFilter = status;
+            
+            // Update button styles
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                btn.classList.add('text-slate-500');
+            });
+            
+            const activeBtn = document.getElementById('filter-' + status);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-500');
+                activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+            }
+            
+            // Re-render table with new filter
+            renderContent();
+        }
+
+        // --- RENDER LOGIC ---
+        function renderContent() {
+            const stuTable = document.getElementById('studentReqTable');
+            if (stuTable) {
+                let myReqs = requests.filter(r => r.student === currentUser.name);
+                
+                // Apply the selected filter
+                if (currentFilter !== 'All') {
+                    myReqs = myReqs.filter(r => r.status === currentFilter);
+                }
+                
+                document.getElementById('stuReqTotal').textContent = myReqs.length;
+                
+                if (myReqs.length === 0) {
+                    stuTable.innerHTML = `<tr><td colspan="4" class="px-8 py-10 text-center text-slate-400 italic">No ${currentFilter !== 'All' ? currentFilter.toLowerCase() : 'tracking'} requests found.</td></tr>`;
+                } else {
+                    stuTable.innerHTML = myReqs.map(r => `
+                        <tr>
+                            <td class="px-8 py-5">
+                                <p class="font-bold text-slate-900">${r.type}</p>
+                                <p class="text-xs text-slate-500">${r.faculty}</p>
+                            </td>
+                            <td class="px-8 py-5 text-center text-sm font-medium text-slate-600">${new Date(r.time).toLocaleString()}</td>
+                            <td class="px-8 py-5 text-center"><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+                            <td class="px-8 py-5">
+                                <p class="text-xs text-slate-500 italic max-w-xs">${r.feedback || 'Awaiting slot assignment...'}</p>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            const grid = document.getElementById('eventsGrid');
+            if (grid) {
+                // Filter out events that should be hidden from the hub
+                const hubEvents = events.filter(e => !e.hideFromHub);
+                
+                grid.innerHTML = hubEvents.map(e => {
+                    let isPast = checkPastEvent(e.date);
+                    
+                    let linkBox = isPast 
+                        ? `<div class="truncate text-xs font-medium text-slate-400">Registration Closed</div>`
+                        : `<div class="truncate text-xs font-medium text-slate-500" title="${e.link}">${e.link}</div>
+                           <a href="${e.link}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 shrink-0" title="Open Link">
+                               <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                           </a>`;
+                           
+                    let regBtn = isPast
+                        ? `<div class="flex-1 block w-full text-center py-3 bg-slate-200 text-slate-500 font-bold rounded-xl cursor-not-allowed">Completed</div>`
+                        : `<a href="${e.link}" target="_blank" rel="noopener noreferrer" class="flex-1 block w-full text-center py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-black transition-all">Register Now</a>`;
+                    
+                    return `
+                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col h-full">
+                        <div class="h-32 bg-indigo-600 p-6 flex justify-between items-start">
+                             <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white"><i class="fa-solid fa-link"></i></div>
+                             <span class="text-[10px] font-black text-white bg-black/20 px-3 py-1 rounded-full uppercase">NEW</span>
+                        </div>
+                        <div class="p-8 -mt-10 flex-1 flex flex-col">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex-1 flex flex-col">
+                                <h4 class="font-black text-xl text-slate-900 mb-2 group-hover:text-primary transition-colors">${e.title}</h4>
+                                <p class="text-sm text-slate-500 mb-6 line-clamp-2 flex-1">${e.desc}</p>
+                                
+                                <div class="flex items-center gap-3 mb-4">
+                                    <p class="text-xs font-bold text-slate-400 uppercase">By ${e.postedBy}</p>
+                                    <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                    <p class="text-xs font-bold text-slate-400 uppercase">${e.date}</p>
+                                </div>
+
+                                <!-- Explicit Registration Link Section -->
+                                <div class="mb-6 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between gap-3">
+                                    ${linkBox}
+                                </div>
+
+                                <div class="flex gap-3 mt-auto">
+                                    ${regBtn}
+                                    <button onclick="viewEventDetails(${e.id})" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-200 transition-all shadow-sm">View Details</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+        }
+
+        // --- NEW DYNAMIC CALENDAR ENGINE ---
+        let currentCalDate = new Date(); 
+        let currentView = 'Month'; 
+
+        function openCalendarModal() {
+            const modal = document.getElementById('calendarModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+            }, 50);
+
+            currentCalDate = new Date(); // Reset to today when opening
+            renderDynamicCalendar();
+        }
+
+        function closeCalendarModal() {
+            const modal = document.getElementById('calendarModal');
+            modal.classList.add('opacity-0');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function viewEventDetails(eventId) {
+            const event = events.find(e => String(e.id) === String(eventId));
+            if (!event) return;
+
+            const modal = document.getElementById('actionModal');
+            const content = document.getElementById('modalContent');
+            
+            let isPast = checkPastEvent(event.date);
+            let regBtn = isPast 
+                ? `<button disabled class="flex-1 py-3.5 font-bold text-slate-400 bg-slate-200 rounded-xl cursor-not-allowed shadow-sm border border-slate-200">Event Completed</button>`
+                : `<a href="${event.link}" target="_blank" rel="noopener noreferrer" class="flex-1 py-3.5 font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all text-center shadow-lg shadow-indigo-200">Register Now</a>`;
+
+            content.innerHTML = `
+                <div class="p-8">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-circle-info text-2xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-900 leading-tight">${event.title}</h4>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Hosted by ${event.postedBy}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1.5">Eligibility Criteria</p>
+                            <p class="text-sm font-bold text-blue-900 flex items-start gap-2">
+                                <i class="fa-solid fa-users text-blue-500 mt-0.5"></i>
+                                <span>${event.eligibility || 'Open to all students'}</span>
+                            </p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Event Overview</p>
+                            <p class="text-sm text-slate-700 leading-relaxed">${event.details || event.desc}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onclick="closeModal()" class="flex-1 py-3.5 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 shadow-sm">Close</button>
+                        ${regBtn}
+                    </div>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+            }, 50);
+        }
+
+        function setCalendarView(view) {
+            currentView = view;
+            renderDynamicCalendar();
+        }
+
+        function navigateCalendar(dir) {
+            if (currentView === 'Month') currentCalDate.setMonth(currentCalDate.getMonth() + dir);
+            else if (currentView === 'Year') currentCalDate.setFullYear(currentCalDate.getFullYear() + dir);
+            else if (currentView === 'Week') currentCalDate.setDate(currentCalDate.getDate() + (dir * 7));
+            else if (currentView === 'Day') currentCalDate.setDate(currentCalDate.getDate() + dir);
+            renderDynamicCalendar();
+        }
+
+        function selectDate(year, month, day) {
+            currentCalDate = new Date(year, month, day);
+            if(currentView === 'Year' || currentView === 'Month') {
+                currentView = 'Day'; 
+            }
+            renderDynamicCalendar();
+        }
+
+        function resetToToday() {
+            currentCalDate = new Date();
+            renderDynamicCalendar();
+        }
+
+        function isSameDay(d1, d2) {
+            return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+        }
+
+        function renderDynamicCalendar() {
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+            const today = new Date();
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            // Update View Toggle Buttons
+            ['Day', 'Week', 'Month', 'Year'].forEach(v => {
+                const btn = document.getElementById('viewBtn-' + v);
+                if(btn) {
+                    if (v === currentView) btn.className = 'px-4 py-1 text-xs font-bold bg-white text-slate-900 rounded-md shadow-sm transition-all';
+                    else btn.className = 'px-4 py-1 text-xs font-bold text-slate-500 rounded-md hover:text-slate-700 transition-all';
+                }
+            });
+
+            // Update Sidebar Title (Always shows month of currentCalDate)
+            document.getElementById('calSidebarTitle').innerText = `${monthNames[month]} ${year}`;
+
+            // Build Mini Calendar in Sidebar
+            const firstDayIndex = new Date(year, month, 1).getDay(); 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            let miniHTML = '';
+            for (let i = 0; i < firstDayIndex; i++) miniHTML += `<div></div>`; 
+            for (let i = 1; i <= daysInMonth; i++) {
+                let cellDate = new Date(year, month, i);
+                let cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                let hasEvent = events.some(e => e.date === cellDateStr);
+                let isSelectedDate = isSameDay(cellDate, currentCalDate);
+                let isTodayActual = isSameDay(cellDate, today);
+
+                let classes = "w-6 h-6 mx-auto flex items-center justify-center rounded-full cursor-pointer transition-colors text-slate-300 hover:bg-slate-700";
+                if (isSelectedDate) classes = "w-6 h-6 mx-auto flex items-center justify-center rounded-full cursor-pointer transition-colors bg-blue-500 text-white font-bold";
+                else if (isTodayActual) classes = "w-6 h-6 mx-auto flex items-center justify-center rounded-full cursor-pointer transition-colors text-blue-400 font-bold";
+                else if (hasEvent) classes += " font-bold bg-[#2A2A2A]";
+
+                miniHTML += `<div onclick="selectDate(${year}, ${month}, ${i})" class="${classes}">${i}</div>`;
+            }
+            document.getElementById('miniCalendarGrid').innerHTML = miniHTML;
+
+            // Update Main Grid Area
+            const container = document.getElementById('calendarGridContainer');
+            if (currentView === 'Month') container.innerHTML = getMonthViewHTML(year, month, firstDayIndex, daysInMonth, today);
+            else if (currentView === 'Week') container.innerHTML = getWeekViewHTML();
+            else if (currentView === 'Day') container.innerHTML = getDayViewHTML();
+            else if (currentView === 'Year') container.innerHTML = getYearViewHTML(year);
+
+            // Build Upcoming Events Sidebar
+            renderUpcomingEventsSidebar(today);
+        }
+
+        // --- CALENDAR VIEW HELPERS ---
+
+        function getMonthViewHTML(year, month, firstDayIndex, daysInMonth, today) {
+            const prevMonthDays = new Date(year, month, 0).getDate();
+            
+            let headerHTML = `
+                <div class="grid grid-cols-7 border-b border-slate-200 shrink-0 bg-white">
+                    ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="py-2 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100 last:border-r-0">${d}</div>`).join('')}
+                </div>`;
+                
+            let gridHTML = '<div class="flex-1 grid grid-cols-7 grid-rows-6 bg-slate-100 gap-[1px] overflow-hidden">';
+            let currentMonthDayCount = 1, nextMonthDayCount = 1;
+
+            for (let i = 0; i < 42; i++) {
+                if (i < firstDayIndex) {
+                    let d = prevMonthDays - firstDayIndex + i + 1;
+                    gridHTML += `<div class="bg-slate-50/50 p-1.5 flex flex-col overflow-hidden text-slate-400 opacity-60"><div class="flex justify-end mb-1.5"><span class="text-xs font-semibold w-6 h-6 flex items-center justify-center">${d}</span></div></div>`;
+                } else if (currentMonthDayCount <= daysInMonth) {
+                    let cellDate = new Date(year, month, currentMonthDayCount);
+                    let isTodayActual = isSameDay(cellDate, today);
+                    let isSelected = isSameDay(cellDate, currentCalDate);
+                    let cellDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(currentMonthDayCount).padStart(2,'0')}`;
+                    
+                    let dayEvents = events.filter(e => e.date === cellDateStr);
+                    let eventsHTML = dayEvents.map(e => `
+                        <a href="${e.link}" target="_blank" class="mb-1 px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 text-[10px] font-bold rounded flex items-center gap-1.5 cursor-pointer truncate transition-colors shadow-sm" title="${e.title}">
+                            <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></div>${e.title}
+                        </a>
+                    `).join('');
+
+                    const bgClass = isSelected ? 'bg-blue-50/40 border-[1.5px] border-blue-400 z-10 -m-[1px]' : (isTodayActual ? 'bg-slate-50' : 'bg-white');
+                    const numClass = isTodayActual ? 'bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md cursor-pointer' : 'text-slate-700 w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-full cursor-pointer transition-colors';
+
+                    gridHTML += `
+                        <div onclick="selectDate(${year}, ${month}, ${currentMonthDayCount})" class="${bgClass} p-1.5 flex flex-col overflow-hidden group">
+                            <div class="flex justify-end mb-1"><span class="text-xs font-semibold ${numClass}">${currentMonthDayCount}</span></div>
+                            <div class="flex-1 overflow-y-auto no-scrollbar pt-0.5">${eventsHTML}</div>
+                        </div>`;
+                    currentMonthDayCount++;
+                } else {
+                    gridHTML += `<div class="bg-slate-50/50 p-1.5 flex flex-col overflow-hidden text-slate-400 opacity-60"><div class="flex justify-end mb-1.5"><span class="text-xs font-semibold w-6 h-6 flex items-center justify-center">${nextMonthDayCount}</span></div></div>`;
+                    nextMonthDayCount++;
+                }
+            }
+            gridHTML += '</div>';
+            return headerHTML + gridHTML;
+        }
+
+        function getWeekViewHTML() {
+            let d = new Date(currentCalDate);
+            d.setDate(d.getDate() - d.getDay()); // Go to Sunday of current week
+            
+            let headerHTML = '<div class="grid grid-cols-7 border-b border-slate-200 shrink-0 bg-white">';
+            let gridHTML = '<div class="flex-1 grid grid-cols-7 gap-[1px] bg-slate-200 overflow-hidden">';
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            
+            for (let i = 0; i < 7; i++) {
+                let isToday = isSameDay(d, new Date());
+                let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                
+                let numClass = isToday ? 'bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center mx-auto shadow-md' : 'text-slate-700 w-8 h-8 flex items-center justify-center mx-auto hover:bg-slate-100 rounded-full cursor-pointer transition-colors';
+                headerHTML += `
+                    <div class="py-3 text-center border-r border-slate-100 last:border-r-0 bg-white">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">${days[i]}</div>
+                        <div class="flex justify-center" onclick="selectDate(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})"><span class="text-lg font-medium ${numClass}">${d.getDate()}</span></div>
+                    </div>`;
+                    
+                let dayEvents = events.filter(e => e.date === dateStr);
+                let eventsHTML = dayEvents.map(e => `
+                    <a href="${e.link}" target="_blank" class="mb-2 px-3 py-2 bg-blue-100 text-blue-800 hover:bg-blue-200 text-xs font-bold rounded-lg flex flex-col gap-1 cursor-pointer transition-colors shadow-sm border border-blue-200" title="${e.title}">
+                        <div class="flex items-center gap-1.5 truncate w-full"><div class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><span class="truncate">${e.title}</span></div>
+                        <span class="text-[10px] font-medium text-blue-600 truncate">${e.postedBy}</span>
+                    </a>
+                `).join('');
+                
+                let bgClass = isToday ? 'bg-blue-50/30' : 'bg-white';
+                gridHTML += `<div class="${bgClass} p-2 flex flex-col overflow-y-auto no-scrollbar border-r border-slate-100 last:border-r-0 pt-3">${eventsHTML}</div>`;
+                
+                d.setDate(d.getDate() + 1);
+            }
+            headerHTML += '</div>';
+            gridHTML += '</div>';
+            return headerHTML + gridHTML;
+        }
+
+        function getDayViewHTML() {
+            let d = currentCalDate;
+            let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            let dayEvents = events.filter(e => e.date === dateStr);
+            
+            let headerHTML = `
+                <div class="p-6 border-b border-slate-200 bg-white shrink-0 shadow-sm z-10 relative">
+                    <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight">${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'})}</h2>
+                    <p class="text-sm text-slate-500 mt-1 font-medium">${dayEvents.length} Event${dayEvents.length !== 1 ? 's' : ''} Scheduled</p>
+                </div>`;
+                
+            let eventsHTML = dayEvents.map(e => {
+                let isPast = checkPastEvent(e.date);
+                let regBtn = isPast
+                    ? `<span class="px-6 py-3 bg-slate-200 text-slate-500 font-bold rounded-xl cursor-not-allowed text-center shrink-0">Completed</span>`
+                    : `<a href="${e.link}" target="_blank" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 text-center shrink-0">Register / View</a>`;
+                
+                return `
+                <div class="mb-4 p-5 bg-white border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-start gap-4">
+                        <div class="w-4 h-4 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] mt-1 shrink-0"></div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg tracking-tight mb-1">${e.title}</h3>
+                            <p class="text-sm text-slate-500 mb-2 leading-relaxed">${e.desc}</p>
+                            <div class="flex items-center gap-3">
+                                <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest bg-slate-100 px-2.5 py-1 rounded-md">Host: ${e.postedBy}</p>
+                            </div>
+                        </div>
+                    </div>
+                    ${regBtn}
+                </div>
+            `}).join('');
+            
+            if (dayEvents.length === 0) eventsHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-slate-400">
+                    <i class="fa-regular fa-calendar-xmark text-6xl mb-4 text-slate-200"></i>
+                    <p class="font-medium text-lg text-slate-500">No events scheduled for this day.</p>
+                </div>`;
+            
+            let gridHTML = `<div class="flex-1 bg-slate-50 p-6 md:p-10 overflow-y-auto no-scrollbar">${eventsHTML}</div>`;
+            return headerHTML + gridHTML;
+        }
+
+        function getYearViewHTML(year) {
+            let gridHTML = `<div class="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-slate-50 overflow-y-auto p-6 md:p-8 no-scrollbar">`;
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            for(let m = 0; m < 12; m++) {
+                let isCurrentMonth = (m === new Date().getMonth() && year === new Date().getFullYear());
+                let titleClass = isCurrentMonth ? "text-blue-600 font-black text-xl" : "text-slate-700 font-bold text-lg";
+                
+                let monthEvents = events.filter(e => {
+                    let ed = new Date(e.date);
+                    return ed.getFullYear() === year && ed.getMonth() === m;
+                });
+                
+                let indicatorHTML = '';
+                if(monthEvents.length > 0) {
+                    indicatorHTML = `<div class="mt-3 flex items-center justify-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"><div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div><span class="text-xs font-bold text-blue-700">${monthEvents.length} Event${monthEvents.length>1?'s':''}</span></div>`;
+                }
+                
+                gridHTML += `
+                    <div onclick="selectDate(${year}, ${m}, 1)" class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 cursor-pointer hover:border-blue-400 hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col items-center justify-center min-h-[160px] group">
+                        <h3 class="${titleClass} group-hover:text-blue-500 transition-colors">${monthNames[m]}</h3>
+                        ${indicatorHTML}
+                    </div>
+                `;
+            }
+            gridHTML += `</div>`;
+            return gridHTML;
+        }
+
+        function renderUpcomingEventsSidebar(today) {
+            // Show ALL events in the sidebar, sorted by date
+            let upcomingEvents = events.sort((a,b) => new Date(a.date) - new Date(b.date));
+            
+            let upcomingHTML = '';
+            if(upcomingEvents.length === 0) {
+                 upcomingHTML = '<div class="text-xs text-slate-500 py-4 italic">No campus events found.</div>';
+            } else {
+                let currentGroup = null;
+                
+                upcomingEvents.forEach(e => {
+                    let eDate = new Date(e.date);
+                    let dateStr = eDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    
+                    if(dateStr !== currentGroup) {
+                        currentGroup = dateStr;
+                        let displayGroup = dateStr;
+                        if(eDate.toDateString() === new Date().toDateString()) displayGroup = 'Today';
+                        else if(eDate.toDateString() === new Date(new Date().setDate(new Date().getDate() + 1)).toDateString()) displayGroup = 'Tomorrow';
+
+                        upcomingHTML += `<h3 class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-6 mb-2 bg-blue-500/10 py-1.5 px-2.5 rounded-lg w-max border border-blue-500/20">${displayGroup}</h3>`;
+                    }
+                    
+                    let isPast = checkPastEvent(e.date);
+                    let regBtn = isPast
+                        ? `<span class="inline-flex items-center gap-1.5 text-[9px] font-bold text-slate-400 bg-slate-700/50 px-2 py-1.5 rounded w-max cursor-not-allowed">Completed</span>`
+                        : `<a href="${e.link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-[9px] font-bold text-white bg-blue-600 hover:bg-blue-500 px-2 py-1.5 rounded transition-colors w-max">
+                                <i class="fa-solid fa-link"></i> Register Here
+                            </a>`;
+                    
+                    upcomingHTML += `
+                        <div class="py-3 border-b border-[#333] last:border-0 hover:bg-[#2A2A2A] px-2 -mx-2 rounded-lg transition-colors group">
+                            <div class="flex gap-3">
+                                <div class="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0 shadow-[0_0_5px_rgba(59,130,246,0.8)] group-hover:scale-125 transition-transform"></div>
+                                <div class="w-full overflow-hidden">
+                                    <div class="text-xs font-bold leading-tight mb-1 text-slate-200 block truncate" title="${e.title}">${e.title}</div>
+                                    <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-2">By ${e.postedBy}</p>
+                                    ${regBtn}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('upcomingEventsList').innerHTML = upcomingHTML;
+        }
+
+        // --- HANDLERS ---
+        function checkAvailabilityInline() {
+            const facName = document.getElementById('reqFaculty').value;
+            const fac = facultyList.find(f => f.name === facName);
+            const statusEl = document.getElementById('availabilityStatus');
+
+            if (fac) {
+                statusEl.classList.remove('hidden');
+                if (!fac.avail) {
+                    statusEl.textContent = `⚠️ ${facName} is currently BUSY. You will be added to a queue.`;
+                    statusEl.className = "mt-2 text-[10px] font-bold text-amber-600";
+                    showQueueNotification(facName);
+                } else {
+                    statusEl.textContent = `✅ ${facName} is currently AVAILABLE.`;
+                    statusEl.className = "mt-2 text-[10px] font-bold text-emerald-600";
+                }
+            } else {
+                statusEl.classList.add('hidden');
+            }
+        }
+
+        function showQueueNotification(name) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `px-6 py-4 rounded-2xl shadow-xl border bg-amber-50 text-amber-700 border-amber-200 flex flex-col gap-3 animate-fade-in-up`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                    <span class="font-bold text-sm text-amber-800">Note: ${name} is not available. You are waiting in a queue.</span>
+                </div>
+                <button onclick="setMockNotification(this)" class="text-xs bg-amber-200 hover:bg-amber-300 py-1.5 px-3 rounded-lg font-bold transition-all text-amber-900 self-start">Get notified when available</button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => { if (toast.parentElement) { toast.classList.add('opacity-0', 'translate-x-full'); setTimeout(() => toast.remove(), 500); } }, 8000);
+        }
+
+        function setMockNotification(btn) {
+            btn.parentElement.remove();
+            showToast('Notification alert set! We will ping you when they are available.', 'success');
+        }
+
+        document.getElementById('requestForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const requestData = {
+    StudentName: currentUser.name,
+    FacultyMember: document.getElementById('reqFaculty').value,
+    Category: document.getElementById('reqCategory').value,
+    PreferredSlot: new Date(document.getElementById('reqTime').value).toISOString(),
+    Reason: document.getElementById('reqReason').value,
+    Status: "Pending",
+    ApprovedSlot: null,
+    SubmittedAt: new Date().toISOString()
+};
+
+    try {
+        const response = await fetch("https://default7359f89671e24daeb8a315cdf97f2f.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4547141133e442b0b944463d6dd204ab/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=k_2o-t_X3-e0ZopV0A0WE0frsJCM8khZc5alsO7_g3A", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) throw new Error("Flow failed");
+
+        showToast("Request submitted successfully!", "success");
+
+        e.target.reset();
+        switchView('trackingView');
+
+    } catch (error) {
+        console.error(error);
+        showToast("Error submitting request", "error");
+    }
+});
+
+        function closeModal() {
+            const modal = document.getElementById('actionModal');
+            modal.classList.add('opacity-0');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = { success: 'bg-emerald-50 text-emerald-600 border-emerald-200', info: 'bg-indigo-50 text-indigo-600 border-indigo-200', error: 'bg-rose-50 text-rose-600 border-rose-200' };
+            toast.className = `px-6 py-4 rounded-2xl shadow-xl border ${colors[type] || colors.info} flex items-center gap-3 animate-fade-in-up transition-all`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span class="font-bold text-sm">${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { 
+                toast.classList.add('opacity-0', 'translate-x-full'); 
+                setTimeout(() => toast.remove(), 500); 
+            }, 3000);
+        }
+
+        window.onload = () => {
+            const sel = document.getElementById('reqFaculty');
+            if (sel) sel.innerHTML = '<option disabled selected value="">Select Target Authority</option>' + facultyList.map(f => `<option value="${f.name}">${f.name} (${f.dept})</option>`).join('');
+            // Waiting for login click
+        };
+    </script>
+</body>
+
+</html>
