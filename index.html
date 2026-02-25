@@ -52,38 +52,45 @@ const msalConfig = {
     auth: {
         clientId: "863e351a-44ba-4b0a-8398-efe98845b17f",
         authority: "https://login.microsoftonline.com/7359f896-71e2-4dae-b8a3-15cdf97f2f10",
-        redirectUri: window.location.origin + "/SlotHub5/index.html"
+        redirectUri: "http://localhost:5500/login.html"
     },
     cache: {
-        cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: false
+        cacheLocation: "sessionStorage"
     }
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
 document.addEventListener("DOMContentLoaded", async () => {
-
     try {
         const response = await msalInstance.handleRedirectPromise();
 
         if (response) {
-            msalInstance.setActiveAccount(response.account);
+            const claims = response.idTokenClaims;
+            const role = claims.roles ? claims.roles[0] : null;
+
+            if (!role) {
+                alert("No role assigned. Contact administrator.");
+                return;
+            }
 
             sessionStorage.setItem("cc_user", JSON.stringify({
                 name: response.account.name,
                 username: response.account.username,
-                id: response.account.localAccountId
+                id: response.account.localAccountId,
+                role: role
             }));
 
-            window.location.replace("home.html");
+            redirectByRole(role);
             return;
         }
 
         const accounts = msalInstance.getAllAccounts();
-
         if (accounts.length > 0) {
-            window.location.replace("home.html");
+            const stored = JSON.parse(sessionStorage.getItem("cc_user"));
+            if (stored && stored.role) {
+                redirectByRole(stored.role);
+            }
         }
 
     } catch (error) {
@@ -95,6 +102,18 @@ function loginWithMicrosoft() {
     msalInstance.loginRedirect({
         scopes: ["openid", "profile", "email"]
     });
+}
+
+function redirectByRole(role) {
+    if (role === "Student") {
+        window.location.replace("student.html");
+    } else if (role === "Faculty") {
+        window.location.replace("faculty.html");
+    } else if (role === "HOD") {
+        window.location.replace("hod.html");
+    } else {
+        alert("Unauthorized role.");
+    }
 }
 </script>
 

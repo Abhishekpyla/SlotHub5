@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Campus Connect | Admin Console</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .view-section { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; }
+        .badge-pending { @apply bg-amber-100 text-amber-700; }
+        .badge-approved { @apply bg-emerald-100 text-emerald-700; }
+        .badge-rejected { @apply bg-rose-100 text-rose-700; }
+        .badge-suggested { @apply bg-indigo-100 text-indigo-700; }
+        
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .transition-all { transition-duration: 200ms; }
+    </style>
+
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', dark: '#0F172A' } } }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden antialiased">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-6 right-6 z-[100] flex flex-col gap-3"></div>
+
+    <!-- INTERNAL LOGIN OVERLAY (Fixes 403 Redirect Issues) -->
+    <div id="loginView"
+        class="fixed inset-0 bg-white z-[60] flex flex-col items-center justify-center p-6 text-center transition-all duration-500">
+        <div class="max-w-md w-full">
+            <div
+                class="w-20 h-20 bg-purple-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-purple-200">
+                <i class="fa-solid fa-shield-halved text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Admin Console</h1>
+            <p class="text-slate-500 mb-10">Smart Campus Connect Integrated System</p>
+
+            <button onclick="login()"
+                class="w-full flex items-center justify-between p-5 rounded-2xl border-2 border-slate-100 hover:border-purple-500 hover:bg-purple-50 group transition-all">
+                <div class="flex items-center gap-4 text-left">
+                    <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                        <i class="fa-solid fa-user-shield text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">Sign In</h3>
+                        <p class="text-xs text-slate-500">Enter as Master Admin</p>
+                    </div>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-purple-600"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <div id="mainLayout" class="hidden flex h-screen">
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col hidden lg:flex">
+            <div class="h-20 flex items-center px-8 border-b border-slate-100 gap-3">
+                <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                    <i class="fa-solid fa-calendar-days text-sm"></i>
+                </div>
+                <span class="font-extrabold text-slate-900 text-lg tracking-tight">CampusHub</span>
+            </div>
+
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div id="userAvatar" class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold text-lg">M</div>
+                    <div class="overflow-hidden">
+                        <h4 id="userName" class="font-bold text-slate-900 truncate">Master Admin</h4>
+                        <p id="userRole" class="text-xs text-slate-500 uppercase font-semibold tracking-wider">Admin</p>
+                    </div>
+                </div>
+                <nav id="navMenu" class="space-y-1.5"></nav>
+            </div>
+
+            <div class="mt-auto p-6 border-t border-slate-100">
+                <button onclick="logout()" class="w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors font-medium">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header class="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8 z-20">
+                <h2 id="viewTitle" class="text-xl font-bold text-slate-900">Control Center</h2>
+                <div class="flex items-center gap-6">
+                    <button class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-all relative">
+                        <i class="fa-regular fa-bell"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="viewContainer" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+                
+                <!-- ADMIN VIEW -->
+                <div id="adminView" class="view-section hidden space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total System Requests</p>
+                            <h4 id="admTotalCount" class="text-3xl font-black text-slate-900">0</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Active Broadcasts</p>
+                            <h4 id="admActiveBroadcasts" class="text-3xl font-black text-purple-600">0</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Server Status</p>
+                            <h4 class="text-lg font-bold text-emerald-600 flex items-center gap-2"><i class="fa-solid fa-check-circle"></i> Operational</h4>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Sync Latency</p>
+                            <h4 class="text-lg font-bold text-slate-900">14ms</h4>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-8 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="text-lg font-bold">Global Log & Slot Assignment</h3>
+                            <button onclick="openManualAppointmentModal()" class="bg-purple-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-purple-700 transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Manual Appointment
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                                        <th class="px-8 py-4">Request ID</th>
+                                        <th class="px-8 py-4">Participant A (Student)</th>
+                                        <th class="px-8 py-4">Participant B (Faculty)</th>
+                                        <th class="px-8 py-4 text-center">Status</th>
+                                        <th class="px-8 py-4 text-right">Admin Override</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminReqTable" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CAMPUS HUB (FOR ADMIN) -->
+                <div id="registrationHubView" class="view-section hidden">
+                    <div class="mb-10">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-2">Campus Registration Hub</h3>
+                        <p class="text-slate-500">Live opportunities available across the campus.</p>
+                    </div>
+                    <div id="eventsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Events Injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL SYSTEM -->
+    <div id="actionModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-6 transition-all opacity-0">
+        <div
+            class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-all">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let requests = [
+            { id: 'REQ-1001', student: 'Jane Doe', faculty: 'Dr. Alan Turing', type: 'Academic', time: '2026-03-05T14:30', status: 'Approved' },
+            { id: 'REQ-1002', student: 'John Smith', faculty: 'Dr. Marie Curie', type: 'Personal', time: '2026-03-06T10:00', status: 'Pending' },
+            { id: 'REQ-1003', student: 'Alice V.', faculty: 'Prof. Feynman', type: 'Academic', time: '2026-03-07T09:00', status: 'Approved' }
+        ];
+
+        // Specific event data with working redirect
+        let events = [
+            { id: 1, title: 'Annual Tech Symposium', link: 'https://symposium.com', desc: 'A global stage for young innovators.', postedBy: 'Dr. Turing', date: '2026-03-20' }
+        ];
+
+        let currentUser = { role: 'admin', name: 'Master Admin' };
+
+        // --- AUTH ---
+        function login() {
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('mainLayout').classList.remove('hidden');
+            
+            buildSidebar();
+            switchView('adminView');
+            showToast('Admin Session Active', 'success');
+        }
+
+        function logout() { 
+            document.getElementById('mainLayout').classList.add('hidden');
+            document.getElementById('loginView').classList.remove('hidden');
+        }
+
+        // --- NAVIGATION ---
+        function buildSidebar() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'adminView', icon: 'fa-chart-pie', label: 'Control Center' },
+                { id: 'registrationHubView', icon: 'fa-globe', label: 'Campus Hub' }
+            ];
+            menu.innerHTML = items.map(item => `
+                <button onclick="switchView('${item.id}')" data-view="${item.id}" class="nav-btn w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-purple-50 hover:text-purple-600 transition-all font-medium">
+                    <i class="fa-solid ${item.icon} w-5"></i><span class="text-sm">${item.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                const isActive = b.dataset.view === viewId;
+                b.classList.toggle('bg-purple-50', isActive); 
+                b.classList.toggle('text-purple-600', isActive);
+            });
+            
+            const titleSpan = document.querySelector(`[data-view="${viewId}"] span`);
+            document.getElementById('viewTitle').textContent = titleSpan ? titleSpan.textContent : 'Control Center';
+            renderContent();
+        }
+
+        // --- RENDER LOGIC ---
+        function renderContent() {
+            // Render Admin Table
+            const admTable = document.getElementById('adminReqTable');
+            if (admTable) {
+                document.getElementById('admTotalCount').textContent = requests.length;
+                document.getElementById('admActiveBroadcasts').textContent = events.length;
+                admTable.innerHTML = requests.map(r => `
+                    <tr>
+                        <td class="px-8 py-4 font-mono text-[10px] text-slate-300">${r.id}</td>
+                        <td class="px-8 py-4 font-bold text-sm text-slate-900">${r.student}</td>
+                        <td class="px-8 py-4 font-bold text-sm text-slate-700">${r.faculty}</td>
+                        <td class="px-8 py-4 text-center"><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+                        <td class="px-8 py-4 text-right"><button onclick="adminAction('${r.id}')" class="text-slate-400 hover:text-purple-600 transition-colors"><i class="fa-solid fa-ellipsis-vertical"></i></button></td>
+                    </tr>
+                `).join('');
+            }
+
+            // Render Campus Hub Events
+            const grid = document.getElementById('eventsGrid');
+            if (grid) {
+                grid.innerHTML = events.map(e => `
+                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col h-full">
+                        <div class="h-32 bg-purple-600 p-6 flex justify-between items-start">
+                             <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white"><i class="fa-solid fa-link"></i></div>
+                             <span class="text-[10px] font-black text-white bg-black/20 px-3 py-1 rounded-full uppercase">NEW</span>
+                        </div>
+                        <div class="p-8 -mt-10 flex-1 flex flex-col">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex-1 flex flex-col">
+                                <h4 class="font-black text-xl text-slate-900 mb-2 group-hover:text-purple-600 transition-colors">${e.title}</h4>
+                                <p class="text-sm text-slate-500 mb-6 line-clamp-2 flex-1">${e.desc}</p>
+                                <div class="flex items-center gap-3 mb-6">
+                                    <p class="text-xs font-bold text-slate-400 uppercase">By ${e.postedBy}</p>
+                                    <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                    <p class="text-xs font-bold text-slate-400 uppercase">${e.date}</p>
+                                </div>
+                                <!-- Target Blank used here so it opens correctly without 403 blocks -->
+                                <a href="${e.link}" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-black transition-all">Go to Event Page</a>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- MODALS & HANDLERS ---
+        function openManualAppointmentModal() {
+            const modal = document.getElementById('actionModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+            }, 50);
+
+            content.innerHTML = `
+                <div class="p-8">
+                    <h4 class="text-xl font-bold mb-6 text-slate-900">Manual Appointment</h4>
+                    <form id="manualAppointmentForm" onsubmit="submitManualAppointment(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Student</label>
+                            <input type="text" id="manualStudent" required placeholder="Student Name" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Faculty</label>
+                            <input type="text" id="manualFaculty" required placeholder="Faculty Name" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Date & Time</label>
+                            <input type="datetime-local" id="manualTime" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        </div>
+                        <div class="flex gap-4 pt-2">
+                            <button type="button" onclick="closeModal()" class="flex-1 py-3 font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all">Cancel</button>
+                            <button type="submit" class="flex-1 py-3 font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 transition-all">Schedule</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+
+        function submitManualAppointment(e) {
+            e.preventDefault();
+            const student = document.getElementById('manualStudent').value;
+            const faculty = document.getElementById('manualFaculty').value;
+            const time = document.getElementById('manualTime').value;
+
+            const newReq = {
+                id: 'REQ-' + (1000 + Math.floor(Math.random() * 9000)),
+                student: student,
+                faculty: faculty,
+                type: 'Admin Override',
+                time: time,
+                status: 'Approved' 
+            };
+
+            requests.unshift(newReq);
+            renderContent();
+            closeModal();
+            showToast('Manual appointment mapped successfully', 'success');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('actionModal');
+            modal.classList.add('opacity-0');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function adminAction(id) {
+            showToast(`Admin intervention tool triggered for ${id}`, 'info');
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = { success: 'bg-emerald-50 text-emerald-600 border-emerald-200', info: 'bg-purple-50 text-purple-600 border-purple-200' };
+            toast.className = `px-6 py-4 rounded-2xl shadow-xl border ${colors[type] || colors.info} flex items-center gap-3 animate-fade-in-up transition-all`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span class="font-bold text-sm">${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { 
+                toast.classList.add('opacity-0', 'translate-x-full'); 
+                setTimeout(() => toast.remove(), 500); 
+            }, 3000);
+        }
+
+        window.onload = () => {
+            // Wait for user to click login
+        };
+    </script>
+</body>
+
+</html>

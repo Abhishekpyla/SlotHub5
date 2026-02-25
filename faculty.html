@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Campus Connect | Faculty Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .view-section {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .badge {
+            @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+        }
+
+        .badge-pending {
+            @apply bg-amber-100 text-amber-700;
+        }
+
+        .badge-approved {
+            @apply bg-emerald-100 text-emerald-700;
+        }
+
+        .badge-rejected {
+            @apply bg-rose-100 text-rose-700;
+        }
+
+        .badge-suggested {
+            @apply bg-indigo-100 text-indigo-700;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .transition-all {
+            transition-duration: 200ms;
+        }
+    </style>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        dark: '#0F172A'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden antialiased">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-6 right-6 z-[100] flex flex-col gap-3"></div>
+
+    <!-- LOGIN OVERLAY -->
+    <div id="loginView"
+        class="fixed inset-0 bg-white z-[60] flex flex-col items-center justify-center p-6 text-center transition-all duration-500">
+        <div class="max-w-md w-full">
+            <div
+                class="w-20 h-20 bg-primary text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-200">
+                <i class="fa-solid fa-chalkboard-user text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Faculty Portal</h1>
+            <p class="text-slate-500 mb-10">Smart Campus Connect Integrated System</p>
+
+            <div class="space-y-4">
+                <button onclick="login()"
+                    class="w-full flex items-center justify-between p-5 rounded-2xl border-2 border-slate-100 hover:border-primary hover:bg-indigo-50 group transition-all">
+                    <div class="flex items-center gap-4 text-left">
+                        <div
+                            class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+                            <i class="fa-solid fa-user-check text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Sign In</h3>
+                            <p class="text-xs text-slate-500">Enter as Dr. Alan Turing</p>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-primary"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <div id="mainLayout" class="hidden flex h-screen">
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col hidden lg:flex">
+            <div class="h-20 flex items-center px-8 border-b border-slate-100 gap-3">
+                <div
+                    class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                    <i class="fa-solid fa-calendar-days text-sm"></i>
+                </div>
+                <span class="font-extrabold text-slate-900 text-lg tracking-tight">CampusHub</span>
+            </div>
+
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div id="userAvatar"
+                        class="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
+                        A</div>
+                    <div class="overflow-hidden">
+                        <h4 id="userName" class="font-bold text-slate-900 truncate">Dr. Alan Turing</h4>
+                        <p id="userRole" class="text-xs text-slate-500 uppercase font-semibold tracking-wider">Faculty</p>
+                    </div>
+                </div>
+
+                <nav id="navMenu" class="space-y-1.5">
+                    <!-- Nav items injected by JS -->
+                </nav>
+            </div>
+
+            <div class="mt-auto p-6 border-t border-slate-100">
+                <button onclick="logout()"
+                    class="w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors font-medium">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+
+            <header class="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8 z-20">
+                <div class="flex items-center gap-4">
+                    <h2 id="viewTitle" class="text-xl font-bold text-slate-900">Action Queue</h2>
+                </div>
+                <div class="flex items-center gap-6">
+                    <!-- Faculty Availability Toggle -->
+                    <div id="availabilitySection"
+                        class="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-full border border-slate-200">
+                        <span class="text-xs font-bold text-slate-500 uppercase">My Status</span>
+                        <button onclick="toggleAvailability()" id="availToggle"
+                            class="relative w-12 h-6 rounded-full bg-emerald-500 transition-colors">
+                            <span id="availCircle"
+                                class="absolute top-1 right-1 w-4 h-4 bg-white rounded-full transition-all"></span>
+                        </button>
+                        <span id="availText" class="text-xs font-bold text-emerald-600">Available</span>
+                    </div>
+                    <button
+                        class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 hover:text-primary hover:bg-indigo-50 transition-all relative">
+                        <i class="fa-regular fa-bell"></i>
+                        <span
+                            class="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                    </button>
+                </div>
+            </header>
+
+            <div id="viewContainer" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+
+                <!-- FACULTY VIEW (Dashboard) -->
+                <div id="facultyView" class="view-section hidden space-y-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Pending In-Queue</p>
+                            <h4 id="facPendingCount" class="text-4xl font-black text-amber-500">0</h4>
+                        </div>
+                        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Outlook Status</p>
+                            <h4 class="text-xl font-bold text-emerald-600 flex items-center gap-2"><i
+                                    class="fa-solid fa-sync"></i> Synchronized</h4>
+                        </div>
+                        <div class="flex items-center justify-end">
+                            <button onclick="openMeetModal('faculty')"
+                                class="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-all">
+                                Request Meeting with Dean
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-8 border-b border-slate-100">
+                            <h3 class="text-lg font-bold">Actionable Requests</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr
+                                        class="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                                        <th class="px-8 py-4">Student</th>
+                                        <th class="px-8 py-4">Reason</th>
+                                        <th class="px-8 py-4 text-center">Proposed Slot</th>
+                                        <th class="px-8 py-4 text-right">Assign / Decision</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="facultyReqTable" class="divide-y divide-slate-100">
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- POST LINK VIEW -->
+                <div id="postLinkView" class="view-section hidden max-w-4xl mx-auto py-10">
+                    <div class="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-12 text-center">
+                        <div
+                            class="w-20 h-20 bg-indigo-50 text-primary rounded-full flex items-center justify-center mx-auto mb-8 text-3xl">
+                            <i class="fa-solid fa-bullhorn"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-slate-900 mb-3">Post Registration Opportunity</h3>
+                        <p class="text-slate-500 mb-10 max-w-md mx-auto">Publish new event links to the student dashboard.</p>
+
+                        <form id="postEventForm" class="text-left space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Event Title</label>
+                                    <input type="text" id="postTitle" required placeholder="e.g. Hackathon 2026"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-primary transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Registration Link (URL)</label>
+                                    <input type="text" id="postLink" required placeholder="Annual Tech Symposium.html"
+                                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-primary transition-all">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Event Description</label>
+                                <textarea id="postDesc" rows="4" required
+                                    placeholder="Outline eligibility and benefits..."
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-primary resize-none"></textarea>
+                            </div>
+                            <button type="submit"
+                                class="w-full py-5 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                                Push to Registration Hub
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- STUDENT HUB (REGISTRATION HUB) -->
+                <div id="registrationHubView" class="view-section hidden">
+                    <div class="mb-10">
+                        <h3 class="text-2xl font-extrabold text-slate-900 mb-2">Campus Registration Hub</h3>
+                        <p class="text-slate-500">Live opportunities currently available for students.</p>
+                    </div>
+                    <div id="eventsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Events Injected via JS -->
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL SYSTEM -->
+    <div id="actionModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-6 transition-all opacity-0">
+        <div
+            class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-all">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let requests = [
+            { id: 'REQ-1001', student: 'Jane Doe', faculty: 'Dr. Alan Turing', type: 'Academic', time: '2026-03-05T14:30', reason: 'Permission for project seminar', status: 'Approved', feedback: 'Slots assigned at Lab 4. Bring documents.' },
+            { id: 'REQ-1002', student: 'John Smith', faculty: 'Dr. Alan Turing', type: 'Personal', time: '2026-03-06T10:00', reason: 'Native visit permission', status: 'Pending', feedback: null }
+        ];
+
+        let events = [
+            { id: 1, title: 'Annual Tech Symposium', link: 'https://symposium.com', desc: 'A global stage for young innovators.', postedBy: 'Dr. Turing', date: '2026-03-20' }
+        ];
+
+        const facultyList = [
+            { name: 'Dr. Alan Turing', dept: 'CS', avail: true }
+        ];
+
+        let currentUser = { role: 'faculty', name: 'Dr. Alan Turing' };
+
+        // --- AUTH ---
+        function login() {
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('mainLayout').classList.remove('hidden');
+            
+            buildSidebar();
+            switchView('facultyView');
+            showToast(`Connected as ${currentUser.name}`, 'success');
+        }
+
+        function logout() {
+            document.getElementById('mainLayout').classList.add('hidden');
+            document.getElementById('loginView').classList.remove('hidden');
+        }
+
+        // --- NAVIGATION ---
+        function buildSidebar() {
+            const menu = document.getElementById('navMenu');
+            const items = [
+                { id: 'facultyView', icon: 'fa-inbox', label: 'Action Queue' },
+                { id: 'postLinkView', icon: 'fa-share-nodes', label: 'Post Link' },
+                { id: 'registrationHubView', icon: 'fa-eye', label: 'Student Hub' }
+            ];
+
+            menu.innerHTML = items.map(item => `
+                <button onclick="switchView('${item.id}')" data-view="${item.id}" class="nav-btn w-full flex items-center gap-3 p-4 rounded-xl text-slate-500 hover:bg-indigo-50 hover:text-primary transition-all font-medium">
+                    <i class="fa-solid ${item.icon} w-5"></i>
+                    <span class="text-sm">${item.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                const isActive = b.dataset.view === viewId;
+                b.classList.toggle('bg-indigo-50', isActive);
+                b.classList.toggle('text-primary', isActive);
+            });
+
+            document.getElementById('viewTitle').textContent = document.querySelector(`[data-view="${viewId}"] span`)?.textContent || 'Dashboard';
+            renderContent();
+        }
+
+        // --- RENDER LOGIC ---
+        function renderContent() {
+            // Actionable Queue
+            const facTable = document.getElementById('facultyReqTable');
+            if (facTable) {
+                const pending = requests.filter(r => r.faculty === currentUser.name && r.status === 'Pending');
+                document.getElementById('facPendingCount').textContent = pending.length;
+                
+                if (pending.length === 0) {
+                    facTable.innerHTML = `<tr><td colspan="4" class="px-8 py-8 text-center text-slate-400 italic">No pending requests at this time.</td></tr>`;
+                } else {
+                    facTable.innerHTML = pending.map(r => `
+                        <tr>
+                            <td class="px-8 py-5">
+                                <p class="font-bold text-slate-900">${r.student}</p>
+                                <p class="text-xs text-slate-400">ID: 21BCS102</p>
+                            </td>
+                            <td class="px-8 py-5">
+                                <p class="text-sm font-bold text-indigo-600">${r.type}</p>
+                                <p class="text-xs text-slate-500 truncate w-48" title="${r.reason}">${r.reason}</p>
+                            </td>
+                            <td class="px-8 py-5 text-sm text-center text-slate-600 font-medium">${new Date(r.time).toLocaleString()}</td>
+                            <td class="px-8 py-5 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button onclick="processStatus('${r.id}', 'Approved')" class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all"><i class="fa-solid fa-check"></i></button>
+                                    <button onclick="openActionModal('${r.id}', 'suggest')" class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all" title="Assign Different Slot"><i class="fa-solid fa-calendar-plus"></i></button>
+                                    <button onclick="openActionModal('${r.id}', 'reject')" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Registration Hub Grid
+            const grid = document.getElementById('eventsGrid');
+            if (grid) {
+                grid.innerHTML = events.map(e => `
+                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col">
+                        <div class="h-32 bg-indigo-600 p-6 flex justify-between items-start">
+                             <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white"><i class="fa-solid fa-link"></i></div>
+                             <span class="text-[10px] font-black text-white bg-black/20 px-3 py-1 rounded-full uppercase">NEW</span>
+                        </div>
+                        <div class="p-8 -mt-10 flex-1 flex flex-col">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex-1 flex flex-col">
+                                <h4 class="font-black text-xl text-slate-900 mb-2 group-hover:text-primary transition-colors">${e.title}</h4>
+                                <p class="text-sm text-slate-500 mb-6 line-clamp-2 flex-1">${e.desc}</p>
+                                <div class="flex items-center gap-3 mb-6">
+                                    <p class="text-xs font-bold text-slate-400 uppercase">By ${e.postedBy}</p>
+                                    <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                    <p class="text-xs font-bold text-slate-400 uppercase">${e.date}</p>
+                                </div>
+                                <!-- Proper Redirect Link implementation -->
+                                <a href="${e.link}" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-black transition-all">Go to Event Page</a>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- HANDLERS ---
+        document.getElementById('postEventForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            events.unshift({
+                id: Date.now(),
+                title: document.getElementById('postTitle').value,
+                link: document.getElementById('postLink').value,
+                desc: document.getElementById('postDesc').value,
+                postedBy: currentUser.name,
+                date: new Date().toISOString().split('T')[0]
+            });
+            e.target.reset();
+            showToast('Registration link live in Student Hub', 'success');
+            switchView('registrationHubView');
+        });
+
+        function processStatus(id, newStatus, feedback = null) {
+            const req = requests.find(r => r.id === id);
+            if (!req) return;
+            req.status = newStatus;
+            req.feedback = feedback || (newStatus === 'Approved' ? 'Slot assigned as requested.' : 'Denied.');
+            showToast(`Update: Request ${id} marked as ${newStatus}`, 'info');
+            renderContent();
+            closeModal();
+        }
+
+        function toggleAvailability() {
+            const fac = facultyList.find(f => f.name === currentUser.name);
+            fac.avail = !fac.avail;
+            const btn = document.getElementById('availToggle');
+            const circle = document.getElementById('availCircle');
+            const text = document.getElementById('availText');
+
+            btn.classList.toggle('bg-emerald-500', fac.avail);
+            btn.classList.toggle('bg-slate-300', !fac.avail);
+            circle.style.right = fac.avail ? '0.25rem' : '1.5rem';
+            text.textContent = fac.avail ? 'Available' : 'Busy';
+            text.className = fac.avail ? 'text-xs font-bold text-emerald-600' : 'text-xs font-bold text-slate-500';
+            showToast(`Status updated to ${text.textContent}`, 'info');
+        }
+
+        // --- MODALS ---
+        function openActionModal(id, mode) {
+            const modal = document.getElementById('actionModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+            }, 50);
+
+            if (mode === 'suggest') {
+                content.innerHTML = `
+                    <div class="p-8">
+                        <h4 class="text-xl font-bold mb-2">Assign Different Slot</h4>
+                        <p class="text-slate-400 text-sm mb-6">Propose a new date/time based on your availability.</p>
+                        <input type="datetime-local" id="newSlotTime" class="w-full bg-slate-50 border p-4 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-primary">
+                        <textarea id="suggestFeedback" class="w-full bg-slate-50 border p-4 rounded-xl text-sm mb-6 outline-none focus:ring-2 focus:ring-primary resize-none" rows="2" placeholder="Note (e.g. Busy in seminar)"></textarea>
+                        <div class="flex gap-4">
+                            <button onclick="closeModal()" class="flex-1 py-3 font-bold text-slate-500 bg-slate-100 rounded-xl">Cancel</button>
+                            <button onclick="confirmSlot('${id}')" class="flex-1 py-3 font-bold text-white bg-indigo-600 rounded-xl">Assign Slot</button>
+                        </div>
+                    </div>
+                `;
+            } else if (mode === 'reject') {
+                content.innerHTML = `
+                    <div class="p-8">
+                        <h4 class="text-xl font-bold mb-2 text-rose-600">Reject Request</h4>
+                        <p class="text-slate-400 text-sm mb-6">Briefly explain the reason for denial.</p>
+                        <textarea id="rejectNote" class="w-full bg-slate-50 border p-4 rounded-xl text-sm mb-6 outline-none focus:ring-2 focus:ring-rose-500 resize-none" rows="3" placeholder="Conflict, documentation missing..."></textarea>
+                        <div class="flex gap-4">
+                            <button onclick="closeModal()" class="flex-1 py-3 font-bold text-slate-500 bg-slate-100 rounded-xl">Back</button>
+                            <button onclick="confirmRejection('${id}')" class="flex-1 py-3 font-bold text-white bg-rose-600 rounded-xl">Confirm</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function confirmSlot(id) {
+            const time = document.getElementById('newSlotTime').value;
+            const note = document.getElementById('suggestFeedback').value;
+            if (!time) return showToast('Please pick a slot', 'error');
+            processStatus(id, 'Suggested', `Suggested new slot: ${new Date(time).toLocaleString()}. ${note}`);
+        }
+
+        function confirmRejection(id) {
+            const note = document.getElementById('rejectNote').value;
+            processStatus(id, 'Rejected', note || 'Declined by faculty.');
+        }
+
+        function openMeetModal() {
+            const modal = document.getElementById('actionModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 50);
+
+            content.innerHTML = `
+                <div class="p-8">
+                    <h4 class="text-xl font-bold mb-6">Assign Internal Meeting</h4>
+                    <div class="space-y-4">
+                        <select class="w-full bg-slate-50 border p-4 rounded-xl outline-none">
+                            <option>Dean of Academics</option>
+                            <option>Head of Department (HOD)</option>
+                            <option>Exam Branch</option>
+                        </select>
+                        <input type="datetime-local" class="w-full bg-slate-50 border p-4 rounded-xl outline-none">
+                        <textarea class="w-full bg-slate-50 border p-4 rounded-xl outline-none resize-none" placeholder="Agenda..."></textarea>
+                        <button onclick="showToast('Invitation dispatched.', 'success'); closeModal();" class="w-full py-4 bg-slate-900 text-white font-bold rounded-xl shadow-lg">Schedule & Assign</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('actionModal');
+            modal.classList.add('opacity-0');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = { success: 'bg-emerald-50 text-emerald-600 border-emerald-200', info: 'bg-indigo-50 text-indigo-600 border-indigo-200', error: 'bg-rose-50 text-rose-600 border-rose-200' };
+            toast.className = `px-6 py-4 rounded-2xl shadow-xl border ${colors[type]} flex items-center gap-3 animate-fade-in-up`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span class="font-bold text-sm">${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { 
+                toast.classList.add('opacity-0', 'translate-x-full'); 
+                setTimeout(() => toast.remove(), 500); 
+            }, 3000);
+        }
+
+        window.onload = () => {
+            // Keep on Login view until clicked
+        };
+    </script>
+</body>
+
+</html>
