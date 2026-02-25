@@ -292,7 +292,7 @@
             const storedUser = sessionStorage.getItem("cc_user");
 
             if (!storedUser) {
-                window.location.replace("login.html");
+                window.location.replace("index.html");
                 return;
             }
 
@@ -300,7 +300,7 @@
 
             if (user.role !== "Student") {
                 alert("Access denied.");
-                window.location.replace("login.html");
+                window.location.replace("index.html");
                 return;
             }
 
@@ -347,7 +347,7 @@
 
         function logout() {
             sessionStorage.clear();
-            window.location.replace("login.html");
+            window.location.replace("index.html");
         }
 
         // Utility to check if an event is in the past
@@ -952,5 +952,4 @@
         }
     </script>
 </body>
-
 </html>
