@@ -62,10 +62,22 @@ const msalConfig = {
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
 document.addEventListener("DOMContentLoaded", async () => {
+
     try {
+
         const response = await msalInstance.handleRedirectPromise();
 
         if (response) {
+
+            // 🔹 Acquire Access Token properly
+            const tokenResponse = await msalInstance.acquireTokenSilent({
+                account: response.account,
+                scopes: ["openid", "profile", "email", "https://adityagroup.sharepoint.com/.default"]
+            });
+
+            const accessToken = tokenResponse.accessToken;
+
+            // 🔹 Get role from token
             const claims = response.idTokenClaims;
             const role = claims.roles ? claims.roles[0] : null;
 
@@ -74,17 +86,60 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
+            // 🔹 Store token
+            sessionStorage.setItem("cc_token", accessToken);
+
+            const email = response.account.username;
+
+            // 🔹 Fetch user details from USERS list
+            const userResponse = await fetch(
+                "https://adityagroup.sharepoint.com/sites/CampusConnect" +
+                "/_api/web/lists/getbytitle('USERS')/items" +
+                `?$select=Id,Email,Name,Role,Department,IsActive,EntraObjectId` +
+                `&$filter=Email eq '${email}'`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        Accept: "application/json;odata=verbose"
+                    }
+                }
+            );
+
+            if (!userResponse.ok) {
+                alert("Unable to fetch user record.");
+                return;
+            }
+
+            const userData = await userResponse.json();
+            const userItem = userData.d.results[0];
+
+            if (!userItem) {
+                alert("User not found or inactive.");
+                return;
+            }
+
+            // 🔹 Verify role consistency
+            if (userItem.Role !== role) {
+                alert("Role mismatch detected.");
+                return;
+            }
+
+            // 🔹 Store enriched user object
             sessionStorage.setItem("cc_user", JSON.stringify({
-                name: response.account.name,
-                username: response.account.username,
-                id: response.account.localAccountId,
-                role: role
+                name: userItem.Name,
+                email: userItem.Email,
+                role: userItem.Role,
+                branch: userItem.Department,
+                userId: userItem.Id,
+                entraObjectId: userItem.EntraObjectId
             }));
 
-            redirectByRole(role);
+            redirectByRole(userItem.Role);
+
             return;
         }
 
+        // If already logged in
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
             const stored = JSON.parse(sessionStorage.getItem("cc_user"));
