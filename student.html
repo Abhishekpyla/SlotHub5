@@ -287,11 +287,126 @@
     </div>
 
     <script>
+
+        // --- DATA STATE ---
+        let requests = [];
+
+        let accessToken = null;
+
+        let events = [];
+
+        const facultyList = [
+            { name: 'Dr. Alan Turing', dept: 'CS', avail: true },
+            { name: 'Dr. Marie Curie', dept: 'Physics', avail: false },
+            { name: 'Prof. Richard Feynman', dept: 'Electronics', avail: true }
+        ];
+        let currentUser = {};   
+        let currentFilter = 'All'; // Store the active filter state
+
+        async function loadStudentRequests() {
+
+            if (!accessToken) {
+                console.error("No access token available.");
+                return;
+            }
+
+            const url =
+                "https://adityagroup.sharepoint.com/sites/CampusConnect" +
+                "/_api/web/lists/getbytitle('Requests')/items" +
+                `?$select=Id,StudentName,StudentUserId,FacultyMember,Category,PreferredSlot,ApprovedSlot,Status,Reason` +
+                `&$filter=StudentUserId eq '${currentUser.email}'` +
+                `&$orderby=Id desc`;
+                
+            try {
+
+                const response = await fetch(url, {
+                    headers: {
+                        "Authorization": `Bearer ${accessToken}`,
+                        "Accept": "application/json;odata=verbose"
+                    }
+                });
+
+                if (!response.ok) throw new Error("SharePoint fetch failed");
+
+                const data = await response.json();
+                const items = data.d.results;
+
+                requests = items.map(item => ({
+                    id: item.Id,
+                    student: item.StudentName,
+                    faculty: item.FacultyMember,
+                    type: item.Category,
+                    time: item.PreferredSlot,
+                    reason: item.Reason,
+                    status: item.Status || "Pending",
+                    feedback: item.ApprovedSlot
+                        ? `Final Slot: ${new Date(item.ApprovedSlot).toLocaleString()}`
+                        : "Awaiting slot assignment..."
+                }));
+
+                renderContent();
+
+            } catch (error) {
+                console.error("Error loading requests:", error);
+            }
+        }
+
+        async function  loadRegistrationEvents() {
+
+            if (!accessToken || !currentUser.branch) {
+                console.error("Missing token or branch.");
+                return;
+            }
+
+            const branch = currentUser.branch;
+
+            const url =
+                "https://adityagroup.sharepoint.com/sites/CampusConnect" +
+                "/_api/web/lists/getbytitle('Events')/items" +
+                `?$filter=Branch eq '${currentUser.branch.trim()}'`;
+
+            try {
+
+                const response = await fetch(url, {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        Accept: "application/json;odata=verbose"
+                    }
+                });
+
+                if (!response.ok) throw new Error("Failed to fetch events");
+
+                console.log("Current User Branch:", currentUser.branch);
+                console.log("Fetch URL:", url);
+
+                const data = await response.json();
+                const items = data.d.results;
+
+                events = items.map(item => ({
+                    id: item.Id,
+                    title: item.eventname || item.Title,
+                    link: item.registrationlink ? item.registrationlink.Url : "#",
+                    desc: item.subheading || "",
+                    postedBy: item.postedfaculty || "Admin",
+                    date: item.posteddate ? item.posteddate.split("T")[0] : null,
+                    eligibility: item.eligibility || "",
+                    details: item.description || "",
+                    hideFromHub: false
+                }));
+
+                renderContent();
+
+            } catch (error) {
+                console.error("Error loading registration events:", error);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
 
+            accessToken = sessionStorage.getItem("cc_token");
             const storedUser = sessionStorage.getItem("cc_user");
 
-            if (!storedUser) {
+            if (!storedUser || !accessToken) {
                 window.location.replace("index.html");
                 return;
             }
@@ -304,46 +419,26 @@
                 return;
             }
 
-            // Replace fake user
             currentUser = {
                 name: user.name,
-                role: user.role
+                email: user.email,
+                role: user.role,
+                branch: user.branch,
+                userId: user.userId,
+                entraObjectId: user.entraObjectId
             };
 
-            // Populate UI
             document.getElementById("userName").textContent = user.name;
             document.getElementById("userRole").textContent = user.role;
-            document.getElementById("userAvatar").textContent = user.name.charAt(0).toUpperCase();
+            document.getElementById("userAvatar").textContent =
+                user.name.charAt(0).toUpperCase();
 
-            document.getElementById('mainLayout').classList.remove('hidden');
+            document.getElementById("mainLayout").classList.remove("hidden");
 
             buildSidebar();
-            switchView('newRequestView');
+            populateFacultyDropdown();   // 🔥 THIS WAS MISSING
+            switchView("newRequestView");
         });
-
-        // --- DATA STATE ---
-        let requests = [
-            { id: 'REQ-1001', student: 'Jane Doe', faculty: 'Dr. Alan Turing', type: 'Academic', time: '2026-03-05T14:30', reason: 'Permission for project seminar', status: 'Approved', feedback: 'Slots assigned at Lab 4. Bring documents.' },
-            { id: 'REQ-1002', student: 'Jane Doe', faculty: 'Dr. Marie Curie', type: 'Personal', time: '2026-03-06T10:00', reason: 'Native visit permission', status: 'Pending', feedback: null }
-        ];
-
-        let events = [
-            { id: 1, title: 'Annual Tech Symposium', link: 'https://symposium.com', desc: 'A global stage for young innovators.', postedBy: 'Dr. Turing', date: '2026-03-20', eligibility: 'All B.Tech & M.Tech Students', details: 'Join us for a full day of tech talks, networking, and project showcases. Registration is mandatory to secure your attendance.', hideFromHub: false },
-            { id: 2, title: 'Code for Cause Hackathon', link: 'https://www.codeforcause.dev/hackathons', desc: 'Build solutions for non-profits.', postedBy: 'Admin', date: '2026-04-15', eligibility: 'CS, IT & Electronics branches (3rd & 4th Year)', details: 'A 48-hour hackathon focused on building software for local NGOs. Teams of 3-4 are allowed. Laptop and college ID required.', hideFromHub: false },
-            { id: 3, title: 'Colors 2025 - Day 1', link: '#', desc: 'Annual Cultural Fest - Inauguration and Arts.', postedBy: 'Cultural Committee', date: '2025-01-08', eligibility: 'All Students', details: 'The grand inauguration of Colors 2025. Enjoy fine arts, painting, and drama performances.', hideFromHub: true },
-            { id: 4, title: 'Colors 2025 - Day 2', link: '#', desc: 'Annual Cultural Fest - Music and Dance.', postedBy: 'Cultural Committee', date: '2025-01-09', eligibility: 'All Students', details: 'Day 2 features inter-college dance and music competitions.', hideFromHub: true },
-            { id: 5, title: 'Colors 2025 - Day 3', link: '#', desc: 'Annual Cultural Fest - DJ Night.', postedBy: 'Cultural Committee', date: '2025-01-10', eligibility: 'All Students', details: 'The grand finale of Colors 2025 with a celebrity DJ.', hideFromHub: true },
-            { id: 6, title: 'Veda 2025 - Day 1', link: '#', desc: 'National Level Technical Symposium.', postedBy: 'Tech Council', date: '2025-09-14', eligibility: 'All Students', details: 'Paper presentations, coding challenges, and robotics workshops.', hideFromHub: true },
-            { id: 7, title: 'Veda 2025 - Day 2', link: '#', desc: 'National Level Technical Symposium.', postedBy: 'Tech Council', date: '2025-09-15', eligibility: 'All Students', details: 'Project expos, intensive 12-hour hackathons, and the valedictory function.', hideFromHub: true }
-        ];
-
-        const facultyList = [
-            { name: 'Dr. Alan Turing', dept: 'CS', avail: true },
-            { name: 'Dr. Marie Curie', dept: 'Physics', avail: false },
-            { name: 'Prof. Richard Feynman', dept: 'Electronics', avail: true }
-        ];
-        let currentUser = {};   
-        let currentFilter = 'All'; // Store the active filter state
 
         function logout() {
             sessionStorage.clear();
@@ -376,8 +471,12 @@
         }
 
         function switchView(viewId) {
-            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
-            document.getElementById(viewId).classList.remove('hidden');
+
+            document.querySelectorAll('.view-section')
+                .forEach(v => v.classList.add('hidden'));
+
+            document.getElementById(viewId)
+                .classList.remove('hidden');
 
             document.querySelectorAll('.nav-btn').forEach(b => {
                 const isActive = b.dataset.view === viewId;
@@ -386,111 +485,186 @@
             });
 
             const titleSpan = document.querySelector(`[data-view="${viewId}"] span`);
-            document.getElementById('viewTitle').textContent = titleSpan ? titleSpan.textContent : 'Dashboard';
+            document.getElementById('viewTitle').textContent =
+                titleSpan ? titleSpan.textContent : 'Dashboard';
+
+            // 🔵 CRITICAL: Load data only when tracking view opens
+            if (viewId === 'trackingView') {
+                loadStudentRequests();
+            }
+
+            if (viewId === 'registrationHubView') {
+                loadRegistrationEvents();
+            }
+
             renderContent();
         }
-
+        
         // --- FILTER LOGIC ---
         function setFilter(status) {
-            currentFilter = status;
-            
-            // Update button styles
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
-                btn.classList.add('text-slate-500');
-            });
-            
-            const activeBtn = document.getElementById('filter-' + status);
-            if (activeBtn) {
-                activeBtn.classList.remove('text-slate-500');
-                activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
-            }
-            
-            // Re-render table with new filter
-            renderContent();
+
+        currentFilter = status;
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+            btn.classList.add('text-slate-500');
+        });
+
+        const activeBtn = document.getElementById('filter-' + status);
+        if (activeBtn) {
+            activeBtn.classList.remove('text-slate-500');
+            activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
         }
+
+        renderContent();
+    }
 
         // --- RENDER LOGIC ---
         function renderContent() {
+
+            // ======================
+            // REQUEST TRACKING TABLE
+            // ======================
             const stuTable = document.getElementById('studentReqTable');
             if (stuTable) {
-                let myReqs = requests.filter(r => r.student === currentUser.name);
-                
-                // Apply the selected filter
+
+                let myReqs = requests;
+
                 if (currentFilter !== 'All') {
                     myReqs = myReqs.filter(r => r.status === currentFilter);
                 }
-                
+
                 document.getElementById('stuReqTotal').textContent = myReqs.length;
-                
+
                 if (myReqs.length === 0) {
-                    stuTable.innerHTML = `<tr><td colspan="4" class="px-8 py-10 text-center text-slate-400 italic">No ${currentFilter !== 'All' ? currentFilter.toLowerCase() : 'tracking'} requests found.</td></tr>`;
+                    stuTable.innerHTML =
+                        `<tr>
+                            <td colspan="4" class="px-8 py-10 text-center text-slate-400 italic">
+                                No ${currentFilter !== 'All'
+                                    ? currentFilter.toLowerCase()
+                                    : 'tracking'} requests found.
+                            </td>
+                        </tr>`;
                 } else {
+
                     stuTable.innerHTML = myReqs.map(r => `
                         <tr>
                             <td class="px-8 py-5">
                                 <p class="font-bold text-slate-900">${r.type}</p>
                                 <p class="text-xs text-slate-500">${r.faculty}</p>
                             </td>
-                            <td class="px-8 py-5 text-center text-sm font-medium text-slate-600">${new Date(r.time).toLocaleString()}</td>
-                            <td class="px-8 py-5 text-center"><span class="badge badge-${r.status.toLowerCase()}">${r.status}</span></td>
+                            <td class="px-8 py-5 text-center text-sm font-medium text-slate-600">
+                                ${r.time ? new Date(r.time).toLocaleString() : '-'}
+                            </td>
+                            <td class="px-8 py-5 text-center">
+                                <span class="badge badge-${r.status.toLowerCase()}">${r.status}</span>
+                            </td>
                             <td class="px-8 py-5">
-                                <p class="text-xs text-slate-500 italic max-w-xs">${r.feedback || 'Awaiting slot assignment...'}</p>
+                                <p class="text-xs text-slate-500 italic max-w-xs">
+                                    ${r.feedback || 'Awaiting slot assignment...'}
+                                </p>
                             </td>
                         </tr>
                     `).join('');
                 }
             }
 
+            // ======================
+            // EVENTS GRID
+            // ======================
             const grid = document.getElementById('eventsGrid');
             if (grid) {
-                // Filter out events that should be hidden from the hub
+
                 const hubEvents = events.filter(e => !e.hideFromHub);
-                
+
                 grid.innerHTML = hubEvents.map(e => {
+
                     let isPast = checkPastEvent(e.date);
-                    
-                    let linkBox = isPast 
-                        ? `<div class="truncate text-xs font-medium text-slate-400">Registration Closed</div>`
-                        : `<div class="truncate text-xs font-medium text-slate-500" title="${e.link}">${e.link}</div>
-                           <a href="${e.link}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 shrink-0" title="Open Link">
-                               <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                           </a>`;
-                           
-                    let regBtn = isPast
-                        ? `<div class="flex-1 block w-full text-center py-3 bg-slate-200 text-slate-500 font-bold rounded-xl cursor-not-allowed">Completed</div>`
-                        : `<a href="${e.link}" target="_blank" rel="noopener noreferrer" class="flex-1 block w-full text-center py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-black transition-all">Register Now</a>`;
-                    
-                    return `
-                    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col h-full">
-                        <div class="h-32 bg-indigo-600 p-6 flex justify-between items-start">
-                             <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white"><i class="fa-solid fa-link"></i></div>
-                             <span class="text-[10px] font-black text-white bg-black/20 px-3 py-1 rounded-full uppercase">NEW</span>
+
+                    let linkBox = isPast
+                        ? `<div class="truncate text-xs font-medium text-slate-400">
+                                Registration Closed
+                        </div>`
+                        : `<div class="truncate text-xs font-medium text-slate-500"
+                                title="${e.link}">
+                                ${e.link}
                         </div>
-                        <div class="p-8 -mt-10 flex-1 flex flex-col">
-                            <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 flex-1 flex flex-col">
-                                <h4 class="font-black text-xl text-slate-900 mb-2 group-hover:text-primary transition-colors">${e.title}</h4>
-                                <p class="text-sm text-slate-500 mb-6 line-clamp-2 flex-1">${e.desc}</p>
-                                
-                                <div class="flex items-center gap-3 mb-4">
-                                    <p class="text-xs font-bold text-slate-400 uppercase">By ${e.postedBy}</p>
-                                    <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
-                                    <p class="text-xs font-bold text-slate-400 uppercase">${e.date}</p>
-                                </div>
+                        <a href="${e.link}" target="_blank"
+                            class="text-indigo-600 hover:text-indigo-800 shrink-0">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>`;
 
-                                <!-- Explicit Registration Link Section -->
-                                <div class="mb-6 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between gap-3">
-                                    ${linkBox}
-                                </div>
+                    let regBtn = isPast
+                        ? `<div class="flex-1 block w-full text-center py-3
+                                bg-slate-200 text-slate-500 font-bold
+                                rounded-xl cursor-not-allowed">
+                                Completed
+                        </div>`
+                        : `<a href="${e.link}" target="_blank"
+                            class="flex-1 block w-full text-center py-3
+                                    bg-slate-900 text-white font-bold
+                                    rounded-xl hover:bg-black transition-all">
+                                Register Now
+                        </a>`;
 
-                                <div class="flex gap-3 mt-auto">
-                                    ${regBtn}
-                                    <button onclick="viewEventDetails(${e.id})" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-200 transition-all shadow-sm">View Details</button>
+                    return `
+                        <div class="bg-white rounded-3xl border border-slate-200
+                                    overflow-hidden shadow-sm hover:shadow-xl
+                                    transition-all group flex flex-col h-full">
+                            <div class="h-32 bg-indigo-600 p-6 flex justify-between items-start">
+                                <div class="w-10 h-10 bg-white/20 rounded-xl
+                                            flex items-center justify-center text-white">
+                                    <i class="fa-solid fa-link"></i>
+                                </div>
+                                <span class="text-[10px] font-black text-white
+                                            bg-black/20 px-3 py-1 rounded-full uppercase">
+                                    NEW
+                                </span>
+                            </div>
+                            <div class="p-8 -mt-10 flex-1 flex flex-col">
+                                <div class="bg-white p-6 rounded-2xl shadow-lg
+                                            border border-slate-100 flex-1 flex flex-col">
+
+                                    <h4 class="font-black text-xl text-slate-900 mb-2
+                                            group-hover:text-primary transition-colors">
+                                        ${e.title}
+                                    </h4>
+
+                                    <p class="text-sm text-slate-500 mb-6 flex-1">
+                                        ${e.desc}
+                                    </p>
+
+                                    <div class="flex items-center gap-3 mb-4">
+                                        <p class="text-xs font-bold text-slate-400 uppercase">
+                                            By ${e.postedBy}
+                                        </p>
+                                        <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                        <p class="text-xs font-bold text-slate-400 uppercase">
+                                            ${e.date}
+                                        </p>
+                                    </div>
+
+                                    <div class="mb-6 bg-slate-50 p-3 rounded-xl
+                                                border border-slate-100 flex items-center
+                                                justify-between gap-3">
+                                        ${linkBox}
+                                    </div>
+
+                                    <div class="flex gap-3 mt-auto">
+                                        ${regBtn}
+                                        <button onclick="viewEventDetails(${e.id})"
+                                            class="flex-1 py-3 bg-slate-100 text-slate-700
+                                                font-bold rounded-xl border border-slate-200
+                                                hover:bg-slate-200 transition-all shadow-sm">
+                                            View Details
+                                        </button>
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `}).join('');
+                    `;
+                }).join('');
             }
         }
 
@@ -807,6 +981,21 @@
             return gridHTML;
         }
 
+        function populateFacultyDropdown() {
+            const select = document.getElementById('reqFaculty');
+            if (!select) return;
+
+            // Clear existing options
+            select.innerHTML = `<option value="">Select Faculty</option>`;
+
+            facultyList.forEach(fac => {
+                const option = document.createElement('option');
+                option.value = fac.name;
+                option.textContent = `${fac.name} (${fac.dept})`;
+                select.appendChild(option);
+            });
+        }
+
         function renderUpcomingEventsSidebar(today) {
             // Show ALL events in the sidebar, sorted by date
             let upcomingEvents = events.sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -896,41 +1085,54 @@
         }
 
         document.getElementById('requestForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+            e.preventDefault();
 
-    const requestData = {
-    StudentName: currentUser.name,
-    FacultyMember: document.getElementById('reqFaculty').value,
-    Category: document.getElementById('reqCategory').value,
-    PreferredSlot: new Date(document.getElementById('reqTime').value).toISOString(),
-    Reason: document.getElementById('reqReason').value,
-    Status: "Pending",
-    ApprovedSlot: null,
-    SubmittedAt: new Date().toISOString()
-};
+            const facultyValue = document.getElementById('reqFaculty').value;
 
-    try {
-        const response = await fetch("https://default7359f89671e24daeb8a315cdf97f2f.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4547141133e442b0b944463d6dd204ab/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=k_2o-t_X3-e0ZopV0A0WE0frsJCM8khZc5alsO7_g3A", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(requestData)
+            if (!facultyValue) {
+                showToast("Please select a faculty member.", "error");
+                return;
+            }
+
+            const timeValue = document.getElementById('reqTime').value;
+            if (!timeValue) {
+                showToast("Please select a preferred slot.", "error");
+                return;
+            }
+
+            const requestData = {
+                StudentUserId: currentUser.email,
+                StudentName: currentUser.name,
+                FacultyMember: facultyValue,
+                Category: document.getElementById('reqCategory').value,
+                PreferredSlot: new Date(timeValue).toISOString(),
+                Reason: document.getElementById('reqReason').value,
+                Status: "Pending",
+                ApprovedSlot: null,
+                SubmittedAt: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch("https://default7359f89671e24daeb8a315cdf97f2f.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4547141133e442b0b944463d6dd204ab/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=k_2o-t_X3-e0ZopV0A0WE0frsJCM8khZc5alsO7_g3A", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) throw new Error("Flow failed");
+
+                showToast("Request submitted successfully!", "success");
+
+                e.target.reset();
+                document.getElementById('availabilityStatus').classList.add('hidden');
+
+                switchView('trackingView');
+
+            } catch (error) {
+                console.error(error);
+                showToast("Error submitting request.", "error");
+            }
         });
-
-        if (!response.ok) throw new Error("Flow failed");
-
-        showToast("Request submitted successfully!", "success");
-
-        e.target.reset();
-        switchView('trackingView');
-
-    } catch (error) {
-        console.error(error);
-        showToast("Error submitting request", "error");
-    }
-});
-
         function closeModal() {
             const modal = document.getElementById('actionModal');
             modal.classList.add('opacity-0');
