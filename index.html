@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             // 🔹 Store token
             sessionStorage.setItem("cc_token", accessToken);
 
-            const email = response.account.username;
+            const email = response.account.username.toLowerCase();
 
             // 🔹 Fetch user details from USERS list
             const userResponse = await fetch(
@@ -111,11 +111,49 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             const userData = await userResponse.json();
-            const userItem = userData.d.results[0];
+
+            let userItem = userData.d.results[0];
 
             if (!userItem) {
-                alert("User not found or inactive.");
-                return;
+
+                console.log("User not found. Auto registering...");
+
+                const email = response.account.username;
+                const name = response.account.name;
+                const entraObjectId = response.account.localAccountId;
+
+                const detectedBranch = detectBranchFromEmail(email);
+
+                const newUser = {
+                    __metadata: { type: "SP.Data.USERSListItem" },
+                    Email: email,
+                    Name: name,
+                    Role: "Student",
+                    Department: detectedBranch,
+                    IsActive: true,
+                    EntraObjectId: entraObjectId
+                };
+
+                const createResponse = await fetch(
+                    "https://adityagroup.sharepoint.com/sites/CampusConnect/_api/web/lists/getbytitle('USERS')/items",
+                    {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            Accept: "application/json;odata=verbose",
+                            "Content-Type": "application/json;odata=verbose"
+                        },
+                        body: JSON.stringify(newUser)
+                    }
+                );
+
+                if (!createResponse.ok) {
+                    alert("Auto registration failed.");
+                    return;
+                }
+
+                const createdData = await createResponse.json();
+                userItem = createdData.d;
             }
 
             // 🔹 Verify role consistency
@@ -153,9 +191,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+function detectBranchFromEmail(email) {
+
+    const roll = email.split("@")[0].toUpperCase();
+
+    // Example: 24P35A4227
+    const branchCode = roll.slice(6, 8);
+
+    const branchMap = {
+        "42": "AIML",
+        "05": "CSE",
+        "44": "DS"
+    };
+
+    return branchMap[branchCode] || "General";
+}
+
 function loginWithMicrosoft() {
     msalInstance.loginRedirect({
-        scopes: ["openid", "profile", "email"]
+        scopes: [
+            "openid",
+            "profile",
+            "email",
+            "https://adityagroup.sharepoint.com/.default"
+        ]
     });
 }
 
