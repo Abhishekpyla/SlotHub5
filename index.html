@@ -61,6 +61,23 @@ const msalConfig = {
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
+async function getRequestDigest(token) {
+
+    const response = await fetch(
+        "https://adityagroup.sharepoint.com/sites/CampusConnect/_api/contextinfo",
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json;odata=verbose"
+            }
+        }
+    );
+
+    const data = await response.json();
+    return data.d.GetContextWebInformation.FormDigestValue;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
 
     try {
@@ -70,21 +87,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (response) {
 
             // 🔹 Acquire Access Token properly
-            const tokenResponse = await msalInstance.acquireTokenSilent({
-                account: response.account,
-                scopes: ["openid", "profile", "email", "https://adityagroup.sharepoint.com/.default"]
-            });
+            let tokenResponse;
+
+            try {
+
+                tokenResponse = await msalInstance.acquireTokenSilent({
+                    account: response.account,
+                    scopes: ["https://adityagroup.sharepoint.com/AllSites.Read"]
+                });
+
+            } catch (error) {
+
+                if (error instanceof msal.InteractionRequiredAuthError) {
+
+                    tokenResponse = await msalInstance.acquireTokenPopup({
+                        scopes: ["https://adityagroup.sharepoint.com/AllSites.Read"]
+                    });
+
+                } else {
+                    throw error;
+                }
+
+            }
 
             const accessToken = tokenResponse.accessToken;
 
             // 🔹 Get role from token
             const claims = response.idTokenClaims;
-            const role = claims.roles ? claims.roles[0] : null;
-
-            if (!role) {
-                alert("No role assigned. Contact administrator.");
-                return;
-            }
 
             // 🔹 Store token
             sessionStorage.setItem("cc_token", accessToken);
@@ -118,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 console.log("User not found. Auto registering...");
 
-                const email = response.account.username;
+                const email = response.account.username.toLowerCase();
                 const name = response.account.name;
                 const entraObjectId = response.account.localAccountId;
 
@@ -134,32 +163,30 @@ document.addEventListener("DOMContentLoaded", async () => {
                     EntraObjectId: entraObjectId
                 };
 
+                const digest = await getRequestDigest(accessToken);
+
                 const createResponse = await fetch(
-                    "https://adityagroup.sharepoint.com/sites/CampusConnect/_api/web/lists/getbytitle('USERS')/items",
-                    {
-                        method: "POST",
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            Accept: "application/json;odata=verbose",
-                            "Content-Type": "application/json;odata=verbose"
-                        },
-                        body: JSON.stringify(newUser)
-                    }
+                "https://adityagroup.sharepoint.com/sites/CampusConnect/_api/web/lists/getbytitle('USERS')/items",
+                {
+                method: "POST",
+                headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/json;odata=verbose",
+                "Content-Type": "application/json;odata=verbose",
+                "X-RequestDigest": digest
+                },
+                body: JSON.stringify(newUser)
+                }
                 );
 
                 if (!createResponse.ok) {
-                    alert("Auto registration failed.");
-                    return;
+                    const text = await createResponse.text();
+                    console.error("User creation error:", text);
+                    throw new Error("User creation failed");
                 }
 
                 const createdData = await createResponse.json();
                 userItem = createdData.d;
-            }
-
-            // 🔹 Verify role consistency
-            if (userItem.Role !== role) {
-                alert("Role mismatch detected.");
-                return;
             }
 
             // 🔹 Store enriched user object
@@ -195,13 +222,13 @@ function detectBranchFromEmail(email) {
 
     const roll = email.split("@")[0].toUpperCase();
 
-    // Example: 24P35A4227
-    const branchCode = roll.slice(6, 8);
+    const branchCode = roll.substring(6,8);
 
     const branchMap = {
         "42": "AIML",
         "05": "CSE",
-        "44": "DS"
+        "44": "DS",
+        "49": "IOT"
     };
 
     return branchMap[branchCode] || "General";
@@ -210,10 +237,8 @@ function detectBranchFromEmail(email) {
 function loginWithMicrosoft() {
     msalInstance.loginRedirect({
         scopes: [
-            "openid",
-            "profile",
-            "email",
-            "https://adityagroup.sharepoint.com/.default"
+            "User.Read",
+            "https://adityagroup.sharepoint.com/AllSites.Read"
         ]
     });
 }
